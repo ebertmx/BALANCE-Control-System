@@ -1,0 +1,6 @@
+MASSBALL = 2.7/1000;
+RADIUSBALL = 20/1000;
+g = -9.8;
+JBALL = 6.207*10^-7;
+s = tf('s');
+TF_ball = -MASSBALL*g/(JBALL/RADIUSBALL^2+MASSBALL)/s^2;
