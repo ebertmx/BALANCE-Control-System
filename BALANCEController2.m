@@ -84,10 +84,10 @@ for i=1:cycles
     sampletime(i) = toc(t);
     
     %control frames per second
-    while(toc<(1/20))
-    continue;
-    
-    end
+%     while(toc(t)<(1/15))
+%     continue;
+%     
+%     end
 end
 
 Controller.StopMotor();
