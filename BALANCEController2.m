@@ -1,4 +1,4 @@
-function TUNEBALANCEController2() %#codegen
+function BALANCEController2() %#codegen
 
 cycles = 1000;
 rpi = raspi();
