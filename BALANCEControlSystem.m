@@ -14,7 +14,7 @@ classdef BALANCEControlSystem <handle %#codegen
         beamSearchRange = 50;
         ballSearchRange = 150;
 
-        Z = 0.380;
+        Z = 0.5;
         LED_HYPO = 0.24309; %m
         LED_lineoffset = 9.85/1000; %m
         LED_refoffset = 8.3/1000 ; %m
@@ -31,7 +31,7 @@ classdef BALANCEControlSystem <handle %#codegen
         bKd = 0.4771;
         bKa = 0.08;
         alphaFilter = 0.1164;
-        bKc = 1;
+        bKc = 0.75;
 
         P_err = zeros(1,2);
         I_err = zeros(1,2);
