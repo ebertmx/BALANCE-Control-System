@@ -1,3 +1,18 @@
+%% About BALANCE Control System
+%Matthew Ebert
+%ebertmx@gmail.com
+
+% Created
+% 2022-AUG-16
+% For
+% University of Vicotria ECE 490
+% Visual Servoing and Computer Vision Control Systems
+% Supervisor: Dr Capson
+
+
+%% Description 
+% This program runs the BALANCE system using the BALANCE controller class
+
 function BALANCEController2() %#codegen
 %% Define Parameters and Plot Arrays
 
