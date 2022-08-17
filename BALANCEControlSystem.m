@@ -1,29 +1,63 @@
+%% About BALANCE Control System
+%Matthew Ebert
+%ebertmx@gmail.com
+
+% Created
+% 2022-AUG-16
+% For
+% University of Vicotria ECE 490
+% Visual Servoing and Computer Vision Control Systems
+% Supervisor: Dr Capson
+
+
+%% Description 
+% This class implements models and provides tool to control the BALANCE
+%system -- a ball and beam control model.
+% An IBVS VS model is used to calculate error signals for the controller
+% signals.
+%The class is initiated with a raspbery pi object and the pins connected to
+%a motor PWM signal and direction.
+%Its methods include PID calculations, Control signal motor control, direct
+%motor control, image capturing, and image processing.
+
 classdef BALANCEControlSystem <handle %#codegen
     properties (Access = public)
+        %Constants and properties values
+        %Pixel refers to image pixel coordinate
+        %Point refers to image plane coordinate
+        %Position refers to real world unit
+
+        %Hardware configuration values
         cam, rpi, DIRpin, PWMpin;
+
+        %Variables for ball, beam, and reference point values
         ballPixel, ballPoint, ballPosition, ballObjectivePosition;
         beamPixels, beamPoints,beamAngle;
         CenterReferencePixels, CenterReferencePoint, ballRadius;
 
+        %image variables
         rawFrame, bimgLOW, bimgHIGH;
         lowThresh = 0.6;
         highThresh = 0.9;
 
+        % Search range for ball and beam relocation
         ballDetectionRadiusRange = [20,40];
-
         beamSearchRange = 50;
         ballSearchRange = 150;
 
+        %Real world offsets for BALANCE system
         Z = 0.5;
         LED_HYPO = 0.24309; %m
         LED_lineoffset = 9.85/1000; %m
         LED_refoffset = 8.3/1000 ; %m
 
+        %Intrinsic Camera Paramters (Calibrated)
         px = 625.21687001741327;
         py = 623.78140876507746;
         u0 = 319.96647337485342;
         v0 = 243.30511332809766;
 
+        %Ball and beam control system signals, gains, and limits
         positionError = zeros(1,2);
         thetaError = zeros(1,2);
         bKp = 0.2105;
@@ -44,10 +78,10 @@ classdef BALANCEControlSystem <handle %#codegen
         maxBeamAngle = 0.2;
         minBeamAngle = -0.2;
 
-        %         mKp = 26.4845;
-        %         mKi = 22.29875*0;
-        %         mKd = 7.31174;
+
+        %Actuator control system signals, gains, and limits
         mKp = 4.125;
+        % integral disabled
         mKi = 0.0038528*(0);
         mKd = 0.27;
 
@@ -59,37 +93,37 @@ classdef BALANCEControlSystem <handle %#codegen
         D_sig = zeros(1,2);
         Dfilter_sig = zeros(1,2);
 
-
         actuatorControlSignal = 0, motorDuty, motorDir;
         maxABSMotorSig= 0.9
         minABSMotorSig = 0.08
 
+        %Clock signals for derivative and interval PID calculations
         thetaclockSig = tic;
         controlclockSig = tic;
 
+        %angle offset to correct for camera frame misalignment
         angleOffset = 0.005;
-
     end
 
     methods
         %         function delete(~)
         %         end
+        %% Initialization 
         function obj = BALANCEControlSystem (setrpi, setPWMpin, setDIRpin)
-            %% Pre Initialization %%
-            % Any code not using output argument (obj)
+
+            %Check if parameters are properly set
             if(isempty(setrpi) || isempty(setDIRpin)||isempty(setPWMpin))
                 disp("need rpi and pin")
-                %                 delete()
             else
                 obj.rpi = setrpi;
                 obj.DIRpin = setDIRpin;
                 obj.PWMpin = setPWMpin;
             end
+            %set the objective position to default (middle of beam)
             obj.ballObjectivePosition = [0;0];
         end
 
-        %% Configure Hardware %%
-
+        %% Hardware Configuration 
         function status = SetUpHardware(obj)
             if(obj.ConfigureMotor() && obj.ConfigureCamera())
                 status = true;
@@ -114,6 +148,7 @@ classdef BALANCEControlSystem <handle %#codegen
         %configure the camera
         function status = ConfigureCamera(obj)
             obj.cam = cameraboard(obj.rpi,'Resolution','640x480');
+            %flush initial camera frames on start up
             for i = 1:10
                 I = snapshot(obj.cam);
             end
@@ -124,7 +159,7 @@ classdef BALANCEControlSystem <handle %#codegen
             end
         end
 
-        %% Image collection, processing, object detection, and VS %%
+        %% Image Aquisition, Processing, Object Detection, and Visual Servoing 
 
         %Get and process images from the camera
         function status = GrabFrames(obj)
@@ -134,6 +169,7 @@ classdef BALANCEControlSystem <handle %#codegen
                 img = imgaussfilt(img,2);
                 %threshhold the gray scale image to isolate the ball
                 obj.bimgLOW = imbinarize(img,obj.lowThresh);
+                %threshhold the gray scale image to isolate the LED points
                 obj.bimgHIGH = imbinarize(img,obj.highThresh);
                 status = true;
             else
@@ -143,17 +179,20 @@ classdef BALANCEControlSystem <handle %#codegen
 
         %Find calibration points in image plane
         function status = CalibrateImage(obj)
+            %Set range of search for middle reference point
             cy1 = 220;
             cy2 = 280;
             cx1 = 280;
             cx2 = 360;
             obj.GrabFrames();
-            if(~isempty(obj.bimgHIGH))
 
+            if(~isempty(obj.bimgHIGH))
+                %Conduct blob search on binary image
                 simg = obj.bimgHIGH(cy1:cy2,cx1:cx2);
                 sc  = regionprops(simg, 'Centroid','Area');
 
                 if (~isempty(sc))
+                    %find blob of correct area
                     scdata = struct2table(sc);
                     id = find(scdata.Area < 100 & scdata.Area>30);
                     if(~isempty(id))
@@ -163,6 +202,7 @@ classdef BALANCEControlSystem <handle %#codegen
                         return;
                     end
                 end
+                %Correct for image resizing
                 obj.CenterReferencePixels = [center(1)+(cx1-1), center(2)+(cy1-1)];
                 obj.CenterReferencePoint = obj.pixel2point(obj.CenterReferencePixels());
                 status = true;
@@ -176,8 +216,11 @@ classdef BALANCEControlSystem <handle %#codegen
         function [statusball, statusbeam] = LocateFeatures(obj)
             %             statusball = false;
             statusbeam = false;
+
+            %Find the center of the ball
             if(obj.GrabFrames())
                 if(~isempty(obj.ballPixel()))
+                    %resize image based on previous location of ball
                     ballx1 =  min(max(uint32(obj.ballPixel(1) - obj.ballSearchRange),1),640);
                     ballx2 = min(max(uint32(obj.ballPixel(1)  + obj.ballSearchRange),1),640);
                     bally1 =min(max(uint32(obj.ballPixel(2)  - obj.ballSearchRange),1),480);
@@ -192,6 +235,7 @@ classdef BALANCEControlSystem <handle %#codegen
                     'ObjectPolarity','bright');
 
                 if(size(centers,2)>=1)
+                    %correct for image resize
                     obj.ballPixel(1,1) = centers(1,1)+ballx1;
                     obj.ballPixel(1,2) = centers(1,2) +bally1;
                     obj.ballRadius = radii(1);
@@ -201,26 +245,24 @@ classdef BALANCEControlSystem <handle %#codegen
                     return;
                 end
 
-                %                 right = obj.bimgH(1:480,540:640);
-                %%limit the range around the previous position
+                %Find beam angle
+
                 if(~isempty(obj.beamPoints()))
+                    %resize image based on the previous position of the beam
                     beamx1 = min(max(uint32(obj.beamPixels(1)-obj.beamSearchRange),1),640);
                     beamx2 = min(max(uint32(obj.beamPixels(1) +obj.beamSearchRange),1),640);
                     beamy1 =min(max(uint32(obj.beamPixels(2) - obj.beamSearchRange),1),480);
                     beamy2 =min(max(uint32(obj.beamPixels(2) + obj.beamSearchRange),1),480);
                     left = obj.bimgHIGH (beamy1:beamy2, beamx1:beamx2);
-
                 else
                     beamx1 = 0;
                     beamy1 = 0;
                     left = obj.bimgHIGH(1:480,1:100);
                 end
-                %
-                %                 rs  = regionprops(right, 'Centroid');
+
                 ls  = regionprops(left, 'Centroid', 'Area');
                 if (~isempty(ls))
-                    %                     obj.beamPoints(1,:) = rs.Centroid;
-                    %                     obj.beamPoints(1,1) = obj.beamPoints(1,1)+539;
+                    %blob search for LED of correct area
                     lsdata = struct2table(ls);
                     idb = find(lsdata.Area < 80 & lsdata.Area>10);
                     if(~isempty(idb))
@@ -229,28 +271,32 @@ classdef BALANCEControlSystem <handle %#codegen
                         statusbeam = false;
                         return;
                     end
-
+                    %correct for image resize
                     obj.beamPixels(1,1) =centroidLED(1) + beamx1-1;
                     obj.beamPixels(1,2) =centroidLED(2) + beamy1-1;
                     obj.beamPoints(1,:) = obj.pixel2point(obj.beamPixels(1,:));
-                    %lcent = ls.Centroid;
-                    %Calculate the angle
+
+                    %Calculate the beam angle
                     ytemp = (obj.beamPoints(1,2) - (obj.LED_lineoffset)) - obj.CenterReferencePoint(1,2);
                     xtemp = -1 * (obj.beamPoints(1,1)-obj.CenterReferencePoint(1,1));
                     obj.beamAngle = obj.angleOffset + atan2(ytemp, xtemp);
-                    %                     obj.beamAngle = pi/2 +obj.angleOffset + atan2( (obj.beamPoints(2,1)-obj.beamPoints(1,1)), ...
-                    %                         (obj.beamPoints(2,2)-obj.beamPoints(1,2))) ;
+
                     statusbeam = true;
                     return;
                 end
-
-
             end
             statusbeam = false;
             statusball = false;
         end
 
-        %% Control Systems %%
+        %Use IBVS to convert from pixels to image plane in meters
+        function meter = pixel2point(obj, pixel)
+            meter = zeros(1,2);
+            meter(1) = (pixel(1) - obj.u0)/obj.px * obj.Z;
+            meter(2) = (pixel(2) - obj.v0)/obj.py * obj.Z;
+
+        end
+        %% Control Systems 
         %set the objective position to the center of the beam
         function  SetObjective(obj)
             if(isempty(obj.CenterReferencePixels))
@@ -369,6 +415,7 @@ classdef BALANCEControlSystem <handle %#codegen
                 obj.actuatorControlSignal(1) = 0;
             end
 
+            %Update previous values
             obj.P_sig(2) = obj.P_sig(1);
             obj.I_sig(2) = obj.I_sig(1);
             obj.Dfilter_sig(2) = obj.Dfilter_sig(1);
@@ -383,6 +430,7 @@ classdef BALANCEControlSystem <handle %#codegen
         %Actuate the motor with the generated motor signal
         function ControlMotor(obj)
             obj.motorDuty = abs(obj.actuatorControlSignal(1));
+
             if sign(obj.actuatorControlSignal(1))>0
                 obj.motorDir =1;
             else
@@ -391,11 +439,22 @@ classdef BALANCEControlSystem <handle %#codegen
 
             writeDigitalPin(obj.rpi, obj.DIRpin, obj.motorDir);
             writePWMDutyCycle(obj.rpi, obj.PWMpin, obj.motorDuty);
-
         end
-        %Run the motor for a specific period of time in a direction and at
-        %a speed.
 
+        
+        %Call to reset control PID timings
+        function DelayPID(obj)
+            obj.controlclockSig = tic;
+            obj.thetaclockSig = tic;
+        end
+
+        %Set the ball and beam control system gains
+        function SetGains (obj,setKp, setKi,setKd)
+            obj.bKp = setKp;
+            obj.bKi = setKi;
+            obj.bKd = setKd;
+        end
+        %% Basic Control 
 
         function RunMotorFor(obj,dir,speed, time)
             temp = tic;
@@ -406,16 +465,15 @@ classdef BALANCEControlSystem <handle %#codegen
             writePWMDutyCycle(obj.rpi, obj.PWMpin, 0);
         end
 
+
         function RunMotor(obj,dir,speed)
             writeDigitalPin(obj.rpi, obj.DIRpin, dir);
             writePWMDutyCycle(obj.rpi, obj.PWMpin, speed);
         end
 
-        %stop the motor
         function StopMotor(obj)
             writePWMDutyCycle(obj.rpi, obj.PWMpin, 0);
         end
-
 
         function RunToAngle(obj, angle,speed)
             obj.LocateFeatures
@@ -430,38 +488,16 @@ classdef BALANCEControlSystem <handle %#codegen
             obj.StopMotor();
         end
 
-        function SetGains (obj,setKp, setKi,setKd)
-            obj.bKp = setKp;
-            obj.bKi = setKi;
-            obj.bKd = setKd;
+        function ShowImage(obj)
+            imshow(obj.bimgLOW)
+            hold on
+            plot(obj.u0,obj.v0, 'b*');
+            plot(obj.CenterReferencePixels(1),obj.CenterReferencePixels(2),'r*')
+            viscircles(obj.ballPixel,26);
+            viscircles(obj.beamPixels, 5);
+            hold off
         end
 
-
-        %
-        %         function ShowImage(obj)
-        %             imshow(obj.bimgLOW)
-        %             hold on
-        %             plot(obj.u0,obj.v0, 'b*');
-        %             plot(obj.CenterReferencePixels(1),obj.CenterReferencePixels(2),'r*')
-        %             viscircles(obj.ballPixel,26);
-        %             viscircles(obj.beamPixels, 5);
-        %             hold off
-        %         end
-
-
-        function meter = pixel2point(obj, pixel)
-            meter = zeros(1,2);
-            meter(1) = (pixel(1) - obj.u0)/obj.px * obj.Z;
-            meter(2) = (pixel(2) - obj.v0)/obj.py * obj.Z;
-
-        end
-
-        function DelayPID(obj)
-
-            obj.controlclockSig = tic;
-            obj.thetaclockSig = tic;
-
-        end
     end
 
 end

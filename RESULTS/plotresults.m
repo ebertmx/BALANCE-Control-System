@@ -5,14 +5,14 @@
 % load("beampixels.mat")
 % load("PIDerrorsignal.mat")
 % load("PIDmotorsignal.mat")
-load("results2.mat")
+load("results3_wihttime.mat")
 
 subplot(2,2,1)
 hold on
 plot(positionError, 'k-');
-plot(thetaError,'r-');
-plot(beamAngle, 'c-');
-plot(motorSignal,'b-');
+%plot(thetaError,'r-');
+%plot(beamAngle, 'c-');
+%plot(motorSignal,'b-');
 hold off
 legend('Position Error', 'Theta Error', 'Beam Angle', 'Motor Signal')
 
@@ -42,3 +42,6 @@ plot(ballPixels(:,1), 'k-')
 plot(ballPixels(:,2), 'c-')
 hold off
 legend('beam i', 'beam j', 'ball i', 'ball j')
+
+clear;
+close all;
