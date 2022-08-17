@@ -48,21 +48,14 @@ end
 Controller.I_err = [0,0];
 Controller.I_sig = [0,0];
 
-%% Main Program
-%run program for the number of cycles
+%% Start 
 for i=1:cycles
-    %fps timer start
     t = tic;
-
-    %attempt to locate the ball and beam
     [statusball, statusbeam] = Controller.LocateFeatures();
-    if(statusball && statusbeam) %if both the ball and beam is located
-        %calculate PID signals
+    if(statusball && statusbeam)
         Controller.CalcPositionError();
         Controller.CalcThetaError();
         Controller.CalcMotorSignal();
-
-        %control the motor
         Controller.ControlMotor();
 
     elseif (~statusball)
@@ -74,11 +67,8 @@ for i=1:cycles
         Controller.StopMotor();
         Controller.DelayPID();
     end
-    %needed to display image in realtime
-    %pause(0.0001)
+    pause(0.0001)
 
-
-    %save controller data
     PIDsig(i,1) = Controller.P_sig(1);
     PIDsig(i,2) = Controller.I_sig(1);
     PIDsig(i,3) = Controller.D_sig(1);
@@ -95,16 +85,14 @@ for i=1:cycles
     ballPixels(i,:) = Controller.ballPixel;
     beamPixels(i,:) = Controller.beamPixels;
     sampletime(i) = toc(t);
-
-    %Used to limit control rate
-
-    %     while(toc(t)<(1/15))
-    %     continue;
-    %
-    %     end
+    
+    %control frames per second
+%     while(toc(t)<(1/15))
+%     continue;
+%     
+%     end
 end
 
-%stop the motor
 Controller.StopMotor();
 
 end

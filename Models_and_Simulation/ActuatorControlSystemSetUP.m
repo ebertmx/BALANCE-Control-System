@@ -13,3 +13,4 @@ TF_motor = GR*KMOTOR/(s*((JMOTOR*s+BMOTOR)*(LMOTOR*s+RMOTOR)+KMOTOR^2));
 b = cell2mat(TF_motor.Numerator);
 a = cell2mat(TF_motor.Denominator);
 [A,B,C,D]= tf2ss(b,a);
+bode(TF_motor)
