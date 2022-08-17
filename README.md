@@ -1,2 +1,2 @@
 # BALANCE_CS
- Control and SImulation of the BALANCE system.
+ Control and Simulation of the BALANCE system.
