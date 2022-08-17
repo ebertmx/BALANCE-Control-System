@@ -13,7 +13,7 @@
 %% Description 
 % This program runs the BALANCE system using the BALANCE controller class
 
-function BALANCEController2() %#codegen
+function MAIN_BALANCEController() %#codegen
 %% Define Parameters and Plot Arrays
 
 cycles = 1000;%number of frames to run system
