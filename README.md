@@ -4,3 +4,6 @@ The BALANCE system is a visual servoing control system which positions a ball on
 ![BALANCE Model](./Documents/BALANCE_Model.png)  
 
 The complete system is described in detail in the documentation located in this repository.
+
+
+![BALANCE Model](./images/Screenshot%202023-01-09%20191008.png)  
